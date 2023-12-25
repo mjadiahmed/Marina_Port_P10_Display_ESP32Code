@@ -75,6 +75,7 @@ void setup()
   // connect to wifi using config or start AP mode
   if (IS_AP)
   {
+  startServer:
     char tmp[15];
     snprintf(tmp, 15, "NEXT_%08X", (uint32_t)ESP.getEfuseMac());
     WiFi.softAP(tmp, _PASSWD_AP);
@@ -87,11 +88,20 @@ void setup()
       WiFi.config(local_ip, gateway, subnet);
 
     WiFi.begin(_SSID, _PASSWD);
-    while (WiFi.status() != WL_CONNECTED)
+    int nowms = millis();
+
+    while ((WiFi.status() != WL_CONNECTED) && ((millis() - nowms) < 10000))
     {
       delay(1000);
       Serial.println(".");
     }
+    if (WiFi.status() != WL_CONNECTED)
+    {
+      Serial.println("[E] WiFi is not connected !");
+
+      goto startServer;
+    }
+
     Serial.println(WiFi.localIP());
   }
 
@@ -417,8 +427,8 @@ void Print_Screen(char SCREEN[32][64])
   {
     Serial2.write('#');
     Serial2.write(y);
-    Serial.write('#');
-    Serial.write(y);
+    // Serial.write('#');
+    // Serial.write(y);
     for (int x = 0; x < 64; x++)
     {
       // Serial.write((SCREEN[line[y]][x] & 0b00001111) | ((SCREEN[line[y] + 8][x] & 0b00001111) << 4));
@@ -426,7 +436,7 @@ void Print_Screen(char SCREEN[32][64])
       Serial2.write((SCREEN[line[y]][x] & 0b00001111) | ((SCREEN[line[y] + 8][x] & 0b00001111) << 4));
     }
 
-    Serial.println("ButtomDisplay");
+    // Serial.println("ButtomDisplay");
 
     for (int x = 0; x < 64; x++)
     {
@@ -434,7 +444,7 @@ void Print_Screen(char SCREEN[32][64])
       // Serial.printf("0x%.2X ", (SCREEN[line[y + 8]][x] & 0b00001111) | ((SCREEN[line[y + 8] + 8][x] & 0b00001111) << 4));
       Serial2.write((SCREEN[line[y + 8]][x] & 0b00001111) | ((SCREEN[line[y + 8] + 8][x] & 0b00001111) << 4));
     }
-    Serial.println();
+    // Serial.println();
   }
 }
 void setup_wifi()
@@ -446,12 +456,17 @@ void setup_wifi()
 
   WiFi.begin(_SSID, _PASSWD);
 
-  while (WiFi.status() != WL_CONNECTED)
+  int nowms = millis();
+
+  while ((WiFi.status() != WL_CONNECTED) && ((millis() - nowms) < 5000))
   {
     delay(500);
     Serial.print(".");
   }
-
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    Serial.println("[E] WiFi is not connected !");
+  }
   Serial.println("");
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
@@ -462,27 +477,30 @@ void callback(char *topic, byte *message, unsigned int length)
   Serial.println("[MQTT] msg received");
   if ((char)message[0] == 0x23)
   {
-    Serial.println("msg received with #");
+    Serial.println("msg received:");
     u8_t index = 0;
     for (u8_t i = 0; i < 16; i++)
     {
-      Serial.println("#");
+      Serial.print("# ");
 
       for (u8_t j = 2; j < 66; j++)
       {
         buf[i][j - 2] = message[(index * 66) + j];
-        Serial.printf("0x%.2X ", buf[i][j - 2]);
+        Serial.printf("%.2X ", buf[i][j - 2]);
       }
+      Serial.println();
+
       index += 1;
     }
-    Serial.println();
 
     for (u8_t i = 0; i < 16; i++)
     {
+      Serial.print("# ");
+
       for (u8_t j = 2; j < 66; j++)
       {
         buf[i][64 + j - 2] = message[(index * 66) + j];
-        Serial.printf("0x%.2X ", buf[i][64 + j - 2]);
+        Serial.printf("%.2X ", buf[i][64 + j - 2]);
       }
       Serial.println();
 
@@ -511,7 +529,7 @@ void reconnect()
 
       if (client.subscribe(TOPIC))
       {
-        Serial.println("Subscribed successfully !");
+        Serial.println("Subscribed successfully to topic: " + String(TOPIC));
       }
     }
     else
